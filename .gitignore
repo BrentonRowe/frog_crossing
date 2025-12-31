@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+.vscode/
+.DS_Store
+
+# Separate nested repo
+tetris-web/
