@@ -27,7 +27,22 @@ if (-not $SkipBuild) {
     try {
         & $python -m pip install -U pygbag
         Remove-Item -Recurse -Force "build\web" -ErrorAction SilentlyContinue
-        & $python -m pygbag frog_crossing.py
+        # pygbag starts a local dev server and blocks.
+        # For publishing, we only need the build output; start it as a process and stop once files exist.
+        $proc = Start-Process -FilePath $python -ArgumentList @('-m','pygbag','frog_crossing.py') -PassThru -NoNewWindow
+        try {
+            $deadline = (Get-Date).AddMinutes(5)
+            while (-not (Test-Path "build\web\index.html") -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            if (-not (Test-Path "build\web\index.html")) {
+                throw "pygbag build did not produce build\\web\\index.html within 5 minutes."
+            }
+        } finally {
+            if ($null -ne $proc -and -not $proc.HasExited) {
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
+        }
     } finally {
         if ($restoreNestedGit -and (Test-Path $nestedGitHidden)) {
             Move-Item $nestedGitHidden $nestedGit
