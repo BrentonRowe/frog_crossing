@@ -345,16 +345,35 @@ class Fly:
 class FrogCrossingGame:
     def __init__(self) -> None:
         pygame.init()
-        flags = pygame.SCALED | pygame.RESIZABLE
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+
+        self.is_web = sys.platform == "emscripten"
+        # On web/mobile, initializing audio can trigger autoplay restrictions and
+        # sometimes results in a "black screen" experience. We don't use audio.
+        if self.is_web:
+            try:
+                pygame.mixer.quit()
+            except Exception:
+                pass
+
+        flags = pygame.RESIZABLE
+        if not self.is_web:
+            flags |= pygame.SCALED
+        try:
+            self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+        except Exception:
+            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Frog Crossing")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 28)
 
         self.sprites = SpriteBank(Path(__file__).parent / "assets")
 
-        self.is_web = sys.platform == "emscripten"
         self.touch = TouchControls(enabled=TOUCH_UI and self.is_web)
+
+        if self.is_web:
+            print("[frog] web init ok")
+        else:
+            print("[frog] desktop init ok")
 
         self.score = 0
         self.level = 1
@@ -376,6 +395,12 @@ class FrogCrossingGame:
         self.last_horizontal_dir = 1
 
         self._build_level(self.level)
+
+        # Draw a first frame immediately so if the loop fails to start,
+        # you still see something other than a black screen.
+        self._draw_background()
+        self._draw_hud()
+        pygame.display.flip()
 
     def _handle_touch_events(self, event: pygame.event.Event) -> None:
         if not self.touch.enabled:
@@ -782,6 +807,7 @@ class FrogCrossingGame:
 
     async def run_async(self) -> None:
         # Web builds (pygbag/emscripten) need an async loop that yields.
+        print("[frog] entered async loop")
         running = True
         while running:
             self.clock.tick(FPS)
