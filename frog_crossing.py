@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import math
 import asyncio
+import traceback
 
 import pygame
 
@@ -979,12 +980,68 @@ class TouchControls:
             surf.blit(txt, (r.centerx - txt.get_width() // 2, r.centery - txt.get_height() // 2))
 
 
+def _render_fatal_error(message: str) -> None:
+    # On mobile web builds, exceptions can end up only in the JS console.
+    # Render a readable error screen so a "black screen" becomes debuggable.
+    try:
+        pygame.init()
+        flags = pygame.SCALED | pygame.RESIZABLE
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+        pygame.display.set_caption("Frog Crossing (Error)")
+        font = pygame.font.SysFont(None, 22)
+
+        lines = ["Frog Crossing crashed:"]
+        for raw in message.splitlines():
+            # Avoid super-wide lines on small screens.
+            while len(raw) > 90:
+                lines.append(raw[:90])
+                raw = raw[90:]
+            lines.append(raw)
+
+        # Show last ~22 lines.
+        lines = lines[-22:]
+        screen.fill((10, 10, 10))
+        y = 12
+        for line in lines:
+            txt = font.render(line, True, (235, 235, 235))
+            screen.blit(txt, (12, y))
+            y += 22
+        pygame.display.flip()
+
+        # Keep the window alive briefly so the message is visible.
+        # On web, this returns control quickly after a few frames.
+        for _ in range(180):
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return
+            pygame.time.delay(16)
+    except Exception:
+        # Last resort: nothing else to do.
+        return
+
+
+async def _web_entry() -> None:
+    try:
+        game = FrogCrossingGame()
+        await game.run_async()
+    except Exception:
+        _render_fatal_error(traceback.format_exc())
+        raise
+
+
 def main() -> None:
-    game = FrogCrossingGame()
     if sys.platform == "emscripten":
-        asyncio.run(game.run_async())
-    else:
-        game.run()
+        # pygbag may already be running an asyncio loop; asyncio.run() would crash.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(_web_entry())
+        else:
+            loop.create_task(_web_entry())
+        return
+
+    game = FrogCrossingGame()
+    game.run()
 
 
 if __name__ == "__main__":
