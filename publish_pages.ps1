@@ -31,12 +31,17 @@ if (-not $SkipBuild) {
         # For publishing, we only need the build output; start it as a process and stop once files exist.
         $proc = Start-Process -FilePath $python -ArgumentList @('-m','pygbag','frog_crossing.py') -PassThru -NoNewWindow
         try {
+            $appName = (Split-Path -Leaf (Get-Location))
+            $apkPath = "build\web\$appName.apk"
             $deadline = (Get-Date).AddMinutes(5)
-            while (-not (Test-Path "build\web\index.html") -and (Get-Date) -lt $deadline) {
+            while ((-not (Test-Path "build\web\index.html") -or -not (Test-Path $apkPath)) -and (Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 250
             }
             if (-not (Test-Path "build\web\index.html")) {
                 throw "pygbag build did not produce build\\web\\index.html within 5 minutes."
+            }
+            if (-not (Test-Path $apkPath)) {
+                throw "pygbag build did not produce $apkPath within 5 minutes."
             }
         } finally {
             if ($null -ne $proc -and -not $proc.HasExited) {
