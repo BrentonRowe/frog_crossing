@@ -27,6 +27,7 @@ if (-not $SkipBuild) {
     try {
         & $python -m pip install -U pygbag
         Remove-Item -Recurse -Force "build\web" -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force "build\web" | Out-Null
         # pygbag starts a local dev server and blocks.
         # For publishing, we only need the build output; start it as a process and stop once files exist.
         $proc = Start-Process -FilePath $python -ArgumentList @('-m','pygbag','frog_crossing.py') -PassThru -NoNewWindow
